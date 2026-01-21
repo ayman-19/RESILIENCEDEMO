@@ -169,49 +169,56 @@ namespace Resilience.WeatherForecast.Controllers
             CancellationToken cancellationToken
         )
         {
-            var retryPolicy = retryPolicyFactory.CreateRetryPolicy<NpgsqlException>();
-
-            return await retryPolicy.ExecuteAsync(async () =>
+            try
             {
-                const string sql = """
-                SELECT 
-                       ProductName,
-                       Description,
-                       Amount
-                FROM Coupon
-                WHERE (@Search IS NULL OR ProductName ILIKE '%' || @Search || '%')
-                ORDER BY ProductName
-                OFFSET @Offset ROWS
-                FETCH NEXT @PageSize ROWS ONLY;
-                """;
+                var retryPolicy = retryPolicyFactory.CreateRetryPolicy<NpgsqlException>();
 
-                logger.LogInformation(
-                    "Fetching coupons | Search={Search}, PageIndex={PageIndex}, PageSize={PageSize}",
-                    string.IsNullOrWhiteSpace(search) ? "NULL" : search,
-                    pageIndex,
-                    pageSize
-                );
+                return await retryPolicy.ExecuteAsync(async () =>
+                {
+                    const string sql = """
+                    SELECT 
+                           ProductName,
+                           Description,
+                           Amount
+                    FROM Coupon
+                    WHERE (@Search IS NULL OR ProductName ILIKE '%' || @Search || '%')
+                    ORDER BY ProductName
+                    OFFSET @Offset ROWS
+                    FETCH NEXT @PageSize ROWS ONLY;
+                    """;
 
-                var result = await connection.QueryAsync(
-                    new CommandDefinition(
-                        sql,
-                        new
-                        {
-                            Search = string.IsNullOrWhiteSpace(search) ? null : search,
-                            Offset = (pageIndex - 1) * pageSize,
-                            PageSize = pageSize,
-                        },
-                        cancellationToken: cancellationToken
-                    )
-                );
+                    logger.LogInformation(
+                        "Fetching coupons | Search={Search}, PageIndex={PageIndex}, PageSize={PageSize}",
+                        string.IsNullOrWhiteSpace(search) ? "NULL" : search,
+                        pageIndex,
+                        pageSize
+                    );
 
-                logger.LogInformation(
-                    "Successfully fetched {Count} coupons",
-                    result.AsList().Count
-                );
+                    var result = await connection.QueryAsync(
+                        new CommandDefinition(
+                            sql,
+                            new
+                            {
+                                Search = string.IsNullOrWhiteSpace(search) ? null : search,
+                                Offset = (pageIndex - 1) * pageSize,
+                                PageSize = pageSize,
+                            },
+                            cancellationToken: cancellationToken
+                        )
+                    );
 
-                return result;
-            });
+                    logger.LogInformation(
+                        "Successfully fetched {Count} coupons",
+                        result.AsList().Count
+                    );
+
+                    return result;
+                });
+            }
+            catch
+            {
+                return Enumerable.Empty<dynamic>();
+            }
         }
     }
 }
