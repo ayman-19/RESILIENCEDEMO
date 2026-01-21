@@ -1,8 +1,12 @@
 ﻿using Polly;
+using Polly.Registry;
 
 namespace Resilience.WeatherForecast.Resiliences;
 
-public class RetryPolicyFactory(ILogger<RetryPolicyFactory> logger) : IRetryPolicyFactory
+public class RetryPolicyFactory(
+    ILogger<RetryPolicyFactory> logger,
+    ResiliencePipelineProvider<ResiliencePipelineKey> provider
+) : IRetryPolicyFactory
 {
     public IAsyncPolicy CreateRetryPolicy<TException>(int maxRetries = 3)
         where TException : Exception
@@ -25,4 +29,6 @@ public class RetryPolicyFactory(ILogger<RetryPolicyFactory> logger) : IRetryPoli
                 }
             );
     }
+
+    public ResiliencePipeline Get(ResiliencePipelineKey key) => provider.GetPipeline(key);
 }

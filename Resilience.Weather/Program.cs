@@ -1,6 +1,8 @@
 ﻿using Microsoft.Extensions.Http.Resilience;
 using Npgsql;
 using Polly;
+using Polly.CircuitBreaker;
+using Polly.Retry;
 using Resilience.WeatherForecast.Resiliences;
 
 namespace Resilience.WeatherForecast;
@@ -18,6 +20,30 @@ public class Program
             );
         });
         builder.Services.AddSingleton<IRetryPolicyFactory, RetryPolicyFactory>();
+        builder.Services.AddResilienceDependencies();
+        builder.Services.AddResiliencePipeline(
+            "db-pipeline",
+            pipeline =>
+            {
+                pipeline.AddTimeout(TimeSpan.FromSeconds(8));
+                pipeline.AddRetry(
+                    new RetryStrategyOptions
+                    {
+                        MaxRetryAttempts = 20,
+                        BackoffType = DelayBackoffType.Exponential,
+                    }
+                );
+                pipeline.AddCircuitBreaker(
+                    new CircuitBreakerStrategyOptions
+                    {
+                        FailureRatio = 0.3,
+                        SamplingDuration = TimeSpan.FromSeconds(30),
+                        MinimumThroughput = 5,
+                        BreakDuration = TimeSpan.FromSeconds(30),
+                    }
+                );
+            }
+        );
 
         builder
             .Services.AddHttpClient(

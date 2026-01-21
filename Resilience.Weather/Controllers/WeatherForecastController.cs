@@ -2,6 +2,7 @@ using Dapper;
 using Microsoft.AspNetCore.Mvc;
 using Npgsql;
 using Polly;
+using Polly.Registry;
 using Resilience.WeatherForecast.Resiliences;
 
 namespace Resilience.WeatherForecast.Controllers
@@ -12,6 +13,7 @@ namespace Resilience.WeatherForecast.Controllers
         IHttpClientFactory factory,
         NpgsqlConnection connection,
         IRetryPolicyFactory retryPolicyFactory,
+        ResiliencePipelineProvider<string> pipelines,
         ILogger<WeatherForecastController> logger
     ) : ControllerBase
     {
@@ -219,6 +221,113 @@ namespace Resilience.WeatherForecast.Controllers
             {
                 return Enumerable.Empty<dynamic>();
             }
+        }
+
+        [HttpGet("copons4/{pageIndex}/{pageSize}/{search}")]
+        public async Task<IEnumerable<dynamic>> GetCoupons4Async(
+            int pageIndex,
+            int pageSize,
+            string? search,
+            CancellationToken cancellationToken
+        )
+        {
+            var pipeline = pipelines.GetPipeline("db-pipeline");
+
+            return await pipeline.ExecuteAsync(async pollyCt =>
+            {
+                const string sql = """
+                SELECT 
+                       ProductName,
+                       Description,
+                       Amount
+                FROM Coupon
+                WHERE (@Search IS NULL OR ProductName ILIKE '%' || @Search || '%')
+                ORDER BY ProductName
+                OFFSET @Offset ROWS
+                FETCH NEXT @PageSize ROWS ONLY;
+                """;
+
+                logger.LogInformation(
+                    "Fetching coupons | Search={Search}, PageIndex={PageIndex}, PageSize={PageSize}",
+                    string.IsNullOrWhiteSpace(search) ? "NULL" : search,
+                    pageIndex,
+                    pageSize
+                );
+
+                var result = await connection.QueryAsync(
+                    new CommandDefinition(
+                        sql,
+                        new
+                        {
+                            Search = string.IsNullOrWhiteSpace(search) ? null : search,
+                            Offset = (pageIndex - 1) * pageSize,
+                            PageSize = pageSize,
+                        },
+                        cancellationToken: cancellationToken
+                    )
+                );
+
+                logger.LogInformation(
+                    "Successfully fetched {Count} coupons",
+                    result.AsList().Count
+                );
+
+                return result;
+            });
+        }
+
+        [HttpGet("copons5/{pageIndex}/{pageSize}/{search}")]
+        public async Task<IEnumerable<dynamic>> GetCoupons5Async(
+            int pageIndex,
+            int pageSize,
+            string? search,
+            CancellationToken cancellationToken
+        )
+        {
+            //var pipeline = pipelines.GetPipeline("db-pipeline");
+            var pipeline = retryPolicyFactory.Get(ResiliencePipelineKey.Database);
+
+            return await pipeline.ExecuteAsync(async pollyCt =>
+            {
+                const string sql = """
+                SELECT 
+                       ProductName,
+                       Description,
+                       Amount
+                FROM Coupon
+                WHERE (@Search IS NULL OR ProductName ILIKE '%' || @Search || '%')
+                ORDER BY ProductName
+                OFFSET @Offset ROWS
+                FETCH NEXT @PageSize ROWS ONLY;
+                """;
+
+                logger.LogInformation(
+                    "Fetching coupons | Search={Search}, PageIndex={PageIndex}, PageSize={PageSize}",
+                    string.IsNullOrWhiteSpace(search) ? "NULL" : search,
+                    pageIndex,
+                    pageSize
+                );
+
+                var result = await connection.QueryAsync(
+                    new CommandDefinition(
+                        sql,
+                        new
+                        {
+                            Search = string.IsNullOrWhiteSpace(search) ? null : search,
+                            Offset = (pageIndex - 1) * pageSize,
+                            PageSize = pageSize,
+                        },
+                        cancellationToken: cancellationToken
+                    )
+                );
+
+                logger.LogInformation(
+                    "Successfully fetched {Count} coupons",
+                    result.AsList().Count
+                );
+
+                return result;
+            });
         }
     }
 }
