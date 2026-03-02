@@ -1,4 +1,5 @@
 <Solution>
   <Project Path="Resilience.Server/Resilience.Server.csproj" Id="7ac64a1c-e60b-4033-b21d-bcd00bcf538a" />
   <Project Path="Resilience.Weather/Resilience.WeatherForecast.csproj" Id="3aaf4f87-ae55-4a81-96db-1a3d251d05b4" />
+  <Project Path="𝐌𝐚𝐩𝐬𝐭𝐞𝐫/𝐌𝐚𝐩𝐬𝐭𝐞𝐫.csproj" Id="c83e10c2-d76a-482f-a2d4-46b95eeb0ddb" />
 </Solution>
